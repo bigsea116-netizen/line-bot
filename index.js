@@ -9,6 +9,7 @@ const config = {
 const app = express();
 
 app.post("/webhook", line.middleware(config), (req, res) => {
+  console.log(JSON.stringify(req,res,null,2));
   Promise.all(req.body.events.map(handleEvent)).then((result) =>
     res.json(result)
   );
