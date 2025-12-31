@@ -38,9 +38,12 @@ const extractWeight = (text) => {
 
 //回数抽出ロジック
 const extractReps = (text) => {
-  const match = text.match(/(\d+(?:回)?(?:(?:\s+|[,、]\s*)\d+(?:回)?)+)/);
+  const match = text.match(
+    /(\d+(?:回)?(?:(?:\s+|[,、]\s*)\d+(?:回)?)+)|(\d+(?:\s+\d+)+)/
+  );
   if (!match) return [];
-  return match[1]
+  const target = match[1] || match[2];
+  return target
     .replace(/回/g, "")
     .split(/[,、\s]+/)
     .map((n) => Number(n))
