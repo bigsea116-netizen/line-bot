@@ -151,14 +151,18 @@ const config = {
 const client = new line.Client(config);
 //express()を実行して Expressアプリケーション（サーバーインスタンス）を生成
 const app = express();
+app.use(express.json());
 
 // /webhook に POST が来たら、LINE の署名検証ミドルウェアを通し、
 // 受け取ったイベントを handleEvent で処理して返信する
-app.post("/webhook", line.middleware(config), (req, res) => {
+app.post("/webhook", line.middleware(config), async (req, res) => {
+  res.sendStatus(200);
   console.log("EVENT:", JSON.stringify(req.body, null, 2));
-  Promise.all(req.body.events.map(handleEvent)).then((result) =>
-    res.json(result)
-  );
+  try {
+    await Promise.all(req.body.events.map(handleEvent));
+  } catch (error) {
+    console.error("Webhook error", error);
+  }
 });
 
 //Quick Reply
