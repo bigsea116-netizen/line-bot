@@ -1,8 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
 //node_modulesにある機能を呼び出して関数、変数化
 //これらのrequireは何が起こっている？→Express アプリを生成するファクトリ関数
 const express = require("express");
 const line = require("@line/bot-sdk");
+const {createClient}=require('@supabase/supabase-js')
 
 //urlとkeyからsupabaseのインスタンスを生成
 const supabase = createClient(
@@ -13,7 +13,7 @@ const supabase = createClient(
 //IDと内容を引数にもらい、supabaseに保存する関数
 //fromは何をしている？→どのテーブルかを指定している
 async function saveTraningLog(userId, content) {
-  const { data, error } = await supabase.from('traning_log').insert([{user_id: userId, content: content}])
+  const { data, error } = await supabase.from('training_log').insert([{user_id: userId, content: content}])
   if (error) throw error
   return data;
 }
@@ -30,7 +30,7 @@ const app = express();
 // /webhook に POST が来たら、LINE の署名検証ミドルウェアを通し、 
 // 受け取ったイベントを handleEvent で処理して返信する
 app.post("/webhook", line.middleware(config), (req, res) => {
-  console.log(JSON.stringify(req, res, null, 2));
+  console.log("EVENT:",JSON.stringify(req.body, null, 2));
   Promise.all(req.body.events.map(handleEvent)).then((result) =>
     res.json(result)
   );
