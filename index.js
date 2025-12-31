@@ -41,6 +41,11 @@ const handleEvent = (event) => {
   if (event.type !== "message" || event.message.type !== "text") {
     return Promise.resolve(null);
   }
+  if(event.message.text==='記録'){
+    return client.replyMessage(event.replyToken,{
+      type: "text", text: "今日のトレーニング内容を教えてください！"
+    })
+  }
   return client.replyMessage(event.replyToken, {
     type: "text",
     text: event.message.text,
