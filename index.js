@@ -142,11 +142,27 @@ const handleEvent = async (event) => {
     try {
       await saveTrainingLog(userId, content);
       delete userState[userId];
-      await client.replyMessage(event.replyToken, {
+
+      return client.replyMessage(event.replyToken, {
         type: "text",
         text: "保存完了しました！",
+        quickReply: {
+          items: [
+            {
+              type: "action",
+              action: { type: "message", label: "記録", text: "記録" },
+            },
+            {
+              type: "action",
+              action: { type: "message", label: "タイマー", text: "タイマー" },
+            },
+            {
+              type: "action",
+              action: { type: "message", label: "グラフ", text: "グラフ" },
+            },
+          ],
+        },
       });
-      return sendQuickReplyMenu(event.replyToken);
     } catch (error) {
       console.error(error);
       return client.replyMessage(event.replyToken, {
