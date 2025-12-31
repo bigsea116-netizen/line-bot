@@ -113,18 +113,15 @@ const sendQuickReplyMenu = (replyToken) => {
       items: [
         {
           type: "action",
-          imageUrl: "https://example.com/icon_record.png",
-          action: { type: "message", label: "記録", text: "記録" },
+          action: { type: "message", label: "🏋️ 記録", text: "記録" },
         },
         {
           type: "action",
-          imageUrl: "https://example.com/icon_timer.png",
-          action: { type: "message", label: "時間", text: "時間" },
+          action: { type: "message", label: "⏱ タイマー", text: "時間" },
         },
         {
           type: "action",
-          imageUrl: "https://example.com/icon_history.png",
-          action: { type: "message", label: "履歴", text: "履歴" },
+          action: { type: "message", label: "📅 履歴", text: "履歴" },
         },
       ],
     },
