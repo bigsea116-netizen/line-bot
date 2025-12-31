@@ -1,9 +1,9 @@
 //node_modulesにある機能を呼び出して関数、変数化
 //これらのrequireは何が起こっている？→Express アプリを生成するファクトリ関数
+const { Redis } = require("@upstash/redis");
 const express = require("express");
 const line = require("@line/bot-sdk");
 const { createClient } = require("@supabase/supabase-js");
-const userState = {};
 
 //運動種類をオブジェクト化
 const EXERCISE_MAP = {
@@ -12,6 +12,12 @@ const EXERCISE_MAP = {
   squat: ["スクワット", "SQ", "squat"],
   // running: ["ランニング", "ラン", "run", "jog"],
 };
+
+// Redis クライアントを作成
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 //Supabase
 const supabase = createClient(
@@ -132,16 +138,19 @@ const handleEvent = async (event) => {
   const content = event.message.text;
 
   if (content === "記録") {
-    userState[userId] = "recording";
+    await redis.set(`state:${userId}`, "recording");
+
     return client.replyMessage(event.replyToken, {
       type: "text",
       text: "今日のトレーニング内容を教えてください！",
     });
   }
-  if (userState[userId] === "recording") {
+
+  const userState = await redis.get(`state:${userId}`);
+  if (userState === "recording") {
     try {
       await saveTrainingLog(userId, content);
-      delete userState[userId];
+      await redis.del(`state:${userId}`);
 
       return client.replyMessage(event.replyToken, {
         type: "text",
