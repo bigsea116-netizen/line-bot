@@ -269,4 +269,5 @@ const handleEvent = async (event) => {
 };
 
 //3000番ポートで待機
-app.listen(3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
