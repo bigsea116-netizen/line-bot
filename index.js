@@ -27,20 +27,21 @@ const detectExercise = (text) => {
       return key;
     }
   }
-  return null;
+  return "unknown";
 };
 
 //重量抽出ロジック
 const extractWeight = (text) => {
-  const match = text.match(/(\d+)\s*kg?/i);
+  const match = text.match(/(\d+)\s*(?:kg|キロ)/i);
   return match ? Number(match[1]) : null;
 };
 
 //回数抽出ロジック
 const extractReps = (text) => {
-  const match = text.match(/(\d+(?:(?:\s+|[,、]\s*)\d+)+)/);
+  const match = text.match(/(\d+(?:回)?(?:(?:\s+|[,、]\s*)\d+(?:回)?)+)/);
   if (!match) return [];
   return match[1]
+    .replace(/回/g, "")
     .split(/[,、\s]+/)
     .map((n) => Number(n))
     .filter((n) => !isNaN(n));
@@ -94,6 +95,30 @@ app.post("/webhook", line.middleware(config), (req, res) => {
   );
 });
 
+//Quick Reply
+const sendQuickReplyMenu = (replyToken) => {
+  return client.replyMessage(replyToken, {
+    type: "text",
+    text: "メニューを選んでください！",
+    quickReply: {
+      items: [
+        {
+          type: "action",
+          action: { type: "message", label: "記録", text: "記録" },
+        },
+        {
+          type: "action",
+          action: { type: "message", label: "タイマー", text: "タイマー" },
+        },
+        {
+          type: "action",
+          action: { type: "message", label: "グラフ", text: "グラフ" },
+        },
+      ],
+    },
+  });
+};
+
 //イベント処理
 //テキストメッセージにのみ返信する
 const handleEvent = async (event) => {
@@ -114,10 +139,11 @@ const handleEvent = async (event) => {
     try {
       await saveTrainingLog(userId, content);
       delete userState[userId];
-      return client.replyMessage(event.replyToken, {
+      await client.replyMessage(event.replyToken, {
         type: "text",
         text: "保存完了しました！",
       });
+      return sendQuickReplyMenu(event.replyToken);
     } catch (error) {
       console.error(error);
       return client.replyMessage(event.replyToken, {
@@ -126,10 +152,7 @@ const handleEvent = async (event) => {
       });
     }
   }
-  return client.replyMessage(event.replyToken, {
-    type: "text",
-    text: event.message.text,
-  });
+  return sendQuickReplyMenu(event.replyToken);
 };
 
 //3000番ポートで待機
