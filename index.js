@@ -1,10 +1,67 @@
 //node_modulesにある機能を呼び出して関数、変数化
 //これらのrequireは何が起こっている？→Express アプリを生成するファクトリ関数
-const { Redis } = require("@upstash/redis");
+const { Redis, errors } = require("@upstash/redis");
 const express = require("express");
 const line = require("@line/bot-sdk");
 const { createClient } = require("@supabase/supabase-js");
 
+//タイマーの選択肢
+const TIMER_OPTIONS = {
+  "1分": 60,
+  "2分": 120,
+  "3分": 180,
+};
+
+//タイマー関数
+async function startTimer(userId, minutesLabel) {
+  const totalSec = TIMER_OPTIONS[minutesLabel];
+  await client.pushMessage(userId, {
+    type: "text",
+    text: `⏱ ${minutesLabel}タイマーを開始しました！`,
+  });
+
+  setTimeout(async () => {
+    try {
+      await client.pushMessage(userId, {
+        type: "text",
+        text: `⏱ 残り10秒`,
+      });
+    } catch (e) {
+      console.error("10秒前通知エラー", e);
+    }
+  }, (totalSec - 10) * 1000);
+
+  setTimeout(async () => {
+    try {
+      await client.pushMessage(userId, {
+        type: "text",
+        text: `⏱ タイマー終了！`,
+        quickReply: {
+          items: [
+            {
+              type: "action",
+              action: { type: "message", label: "🏋️ 記録", text: "記録" },
+            },
+            {
+              type: "action",
+              action: {
+                type: "message",
+                label: "⏱ タイマー",
+                text: "タイマー",
+              },
+            },
+            {
+              type: "action",
+              action: { type: "message", label: "📅 履歴", text: "履歴" },
+            },
+          ],
+        },
+      });
+    } catch (e) {
+      console.error("タイマー終了エラー", e);
+    }
+  }, totalSec * 1000);
+}
 //運動種類をオブジェクト化
 const EXERCISE_MAP = {
   bench_press: ["ベンチ", "ベンチプレス", "BP", "bench"],
@@ -117,7 +174,7 @@ const sendQuickReplyMenu = (replyToken) => {
         },
         {
           type: "action",
-          action: { type: "message", label: "⏱ タイマー", text: "時間" },
+          action: { type: "message", label: "⏱ タイマー", text: "タイマー" },
         },
         {
           type: "action",
@@ -144,6 +201,34 @@ const handleEvent = async (event) => {
       type: "text",
       text: "今日のトレーニング内容を教えてください！",
     });
+  }
+
+  if (content === "タイマー") {
+    return client.replyMessage(event.replyToken, {
+      type: "text",
+      text: "タイマー時間を選んでください！",
+      quickReply: {
+        items: [
+          {
+            type: "action",
+            action: { type: "message", label: "1分", text: "1分" },
+          },
+          {
+            type: "action",
+            action: { type: "message", label: "2分", text: "2分" },
+          },
+          {
+            type: "action",
+            action: { type: "message", label: "3分", text: "3分" },
+          },
+        ],
+      },
+    });
+  }
+
+  if (content in TIMER_OPTIONS) {
+    await startTimer(userId, content);
+    return;
   }
 
   const userState = await redis.get(`state:${userId}`);
