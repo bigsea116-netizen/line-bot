@@ -1,66 +1,75 @@
 //node_modulesにある機能を呼び出して関数、変数化
 //これらのrequireは何が起こっている？→Express アプリを生成するファクトリ関数
-const { Redis, errors } = require("@upstash/redis");
-const express = require("express");
-const line = require("@line/bot-sdk");
-const { createClient } = require("@supabase/supabase-js");
+import express from "express";
+import type { Request, Response } from "express";
+import { Redis } from "@upstash/redis";
+// LINE SDK なども同様
+import * as line from "@line/bot-sdk";
+import type { WebhookEvent, ClientConfig,MessageAPIResponseBase } from "@line/bot-sdk";
+import { createClient } from "@supabase/supabase-js";
+
 
 //タイマーの選択肢
 const TIMER_OPTIONS = {
   "1分": 60,
   "2分": 120,
   "3分": 180,
-};
+} as const;
 
 //タイマー関数
-async function startTimer(userId, minutesLabel) {
-  const totalSec = TIMER_OPTIONS[minutesLabel];
-  await client.pushMessage(userId, {
-    type: "text",
-    text: `⏱ ${minutesLabel}タイマーを開始しました！`,
-  });
-
-  setTimeout(async () => {
-    try {
-      await client.pushMessage(userId, {
-        type: "text",
-        text: `⏱ 残り10秒`,
-      });
-    } catch (e) {
-      console.error("10秒前通知エラー", e);
-    }
-  }, (totalSec - 10) * 1000);
-
-  setTimeout(async () => {
-    try {
-      await client.pushMessage(userId, {
-        type: "text",
-        text: `⏱ タイマー終了！`,
-        quickReply: {
-          items: [
-            {
-              type: "action",
-              action: { type: "message", label: "🏋️ 記録", text: "記録" },
-            },
-            {
-              type: "action",
-              action: {
-                type: "message",
-                label: "⏱ タイマー",
-                text: "タイマー",
+type TimerLabel = keyof typeof TIMER_OPTIONS;
+async function startTimer(userId: string, minutesLabel: string
+) {
+  if(minutesLabel in TIMER_OPTIONS){
+    const label=minutesLabel as TimerLabel;
+    const totalSec = TIMER_OPTIONS[label];
+    await client.pushMessage(userId, {
+      type: "text",
+      text: `⏱ ${minutesLabel}タイマーを開始しました！`,
+    });
+  
+    setTimeout(async () => {
+      try {
+        await client.pushMessage(userId, {
+          type: "text",
+          text: `⏱ 残り10秒`,
+        });
+      } catch (e) {
+        console.error("10秒前通知エラー", e);
+      }
+    }, (totalSec - 10) * 1000);
+  
+    setTimeout(async () => {
+      try {
+        await client.pushMessage(userId, {
+          type: "text",
+          text: `⏱ タイマー終了！`,
+          quickReply: {
+            items: [
+              {
+                type: "action",
+                action: { type: "message", label: "🏋️ 記録", text: "記録" },
               },
-            },
-            {
-              type: "action",
-              action: { type: "message", label: "📅 履歴", text: "履歴" },
-            },
-          ],
-        },
-      });
-    } catch (e) {
-      console.error("タイマー終了エラー", e);
-    }
-  }, totalSec * 1000);
+              {
+                type: "action",
+                action: {
+                  type: "message",
+                  label: "⏱ タイマー",
+                  text: "タイマー",
+                },
+              },
+              {
+                type: "action",
+                action: { type: "message", label: "📅 履歴", text: "履歴" },
+              },
+            ],
+          },
+        });
+      } catch (e) {
+        console.error("タイマー終了エラー", e);
+      }
+    }, totalSec * 1000);
+  }
 }
 //運動種類をオブジェクト化
 const EXERCISE_MAP = {
@@ -77,13 +86,17 @@ const redis = new Redis({
 });
 
 //Supabase
+const supabaseUrl=process.env["SUPABASE_URL"];
+const supabaseKey=process.env["SUPABASE_KEY"];
+if(!supabaseUrl||!supabaseKey){
+  throw new Error("Missing Supabase environment variables.")
+}
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  supabaseUrl,supabaseKey
 );
 
 //種目判定ロジック
-const detectExercise = (text) => {
+const detectExercise = (text:string) => {
   const lowerText = text.toLowerCase();
   for (const [key, aliases] of Object.entries(EXERCISE_MAP)) {
     if (aliases.some((alias) => lowerText.includes(alias.toLowerCase()))) {
@@ -94,18 +107,21 @@ const detectExercise = (text) => {
 };
 
 //重量抽出ロジック
-const extractWeight = (text) => {
+const extractWeight = (text:string) => {
   const match = text.match(/(\d+)\s*(?:kg|キロ)/i);
   return match ? Number(match[1]) : null;
 };
 
 //回数抽出ロジック
-const extractReps = (text) => {
+const extractReps = (text:string) => {
   const match = text.match(
     /(\d+(?:回)?(?:(?:\s+|[,、]\s*)\d+(?:回)?)+)|(\d+(?:\s+\d+)+)/
   );
   if (!match) return [];
   const target = match[1] || match[2];
+  if(!target){
+    throw new Error("Missing target")
+  }
   return target
     .replace(/回/g, "")
     .split(/[,、\s]+/)
@@ -114,7 +130,7 @@ const extractReps = (text) => {
 };
 
 //入力値正規関数
-const parseTrainingInput = (text) => {
+const parseTrainingInput = (text:string) => {
   const exercise = detectExercise(text);
   const weight = extractWeight(text);
   const reps = extractReps(text);
@@ -130,7 +146,7 @@ const parseTrainingInput = (text) => {
 
 //Supabaseに保存
 //fromは何をしている？→どのテーブルかを指定している
-async function saveTrainingLog(userId, content) {
+async function saveTrainingLog(userId:string, content:string) {
   const parsedData = parseTrainingInput(content);
   const { data, error } = await supabase
     .from("training_log")
@@ -141,9 +157,9 @@ async function saveTrainingLog(userId, content) {
 
 //LINE configを作成
 // 環境変数をべた書きするのはよくない
-const config = {
-  channelAccessToken: process.env.ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET,
+const config:ClientConfig&line.MiddlewareConfig = {
+  channelAccessToken: process.env["ACCESS_TOKEN"]||"",
+  channelSecret: process.env["CHANNEL_SECRET"]||"",
 };
 
 //サーバー起動時に1回だけ生成
@@ -171,7 +187,7 @@ app.post(
 app.use(express.json());
 
 //Quick Reply
-const sendQuickReplyMenu = (replyToken) => {
+const sendQuickReplyMenu = (replyToken:string):Promise<MessageAPIResponseBase> => {
   return client.replyMessage(replyToken, {
     type: "text",
     text: "メニューを選んでください！",
@@ -196,7 +212,7 @@ const sendQuickReplyMenu = (replyToken) => {
 
 //イベント処理
 //テキストメッセージにのみ返信する
-const handleEvent = async (event) => {
+const handleEvent = async (event:WebhookEvent) => {
   if (event.type !== "message" || event.message.type !== "text") {
     return Promise.resolve(null);
   }
@@ -236,6 +252,7 @@ const handleEvent = async (event) => {
   }
 
   if (content in TIMER_OPTIONS) {
+  if(!userId)return;
     await startTimer(userId, content);
     return;
   }
@@ -243,6 +260,7 @@ const handleEvent = async (event) => {
   const userState = await redis.get(`state:${userId}`);
   if (userState === "recording") {
     try {
+        if(!userId)return;
       await saveTrainingLog(userId, content);
       await redis.del(`state:${userId}`);
 
